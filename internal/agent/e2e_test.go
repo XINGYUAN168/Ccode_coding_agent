@@ -34,7 +34,7 @@ func TestE2E_DeepSeekMultiTurnTools(t *testing.T) {
 	}
 
 	provider := config.ProviderConfig{
-		Name: "deepseek-e2e", Protocol: config.ProtocolOpenAI,
+		Name: "deepseek-e2e", Protocol: config.ProtocolOpenAICompat,
 		BaseURL: endpoint, APIKey: apiKey, Model: model, Thinking: true,
 	}
 	client, err := llmfactory.NewFactory(llmfactory.Options{}).New(provider, "你正在执行自动化工具测试。必须严格遵守用户给出的工具顺序。")
@@ -47,7 +47,7 @@ func TestE2E_DeepSeekMultiTurnTools(t *testing.T) {
 	registry.Register(&tools.ReadFileTool{FileStateCache: cache})
 	registry.Register(&tools.WriteFileTool{FileStateCache: cache})
 
-	agent := New(client, registry, config.ProtocolOpenAI)
+	agent := New(client, registry, config.ProtocolOpenAICompat)
 	agent.WorkDir = workDir
 	agent.MaxIterations = 10
 	agent.ContextWindow = provider.GetContextWindow()

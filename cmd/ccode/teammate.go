@@ -208,7 +208,7 @@ func buildTeammateRegistry(ctx context.Context, opts teammateToolOptions) *tools
 		mgr.LoadConfigs(serverConfigs)
 		mgr.RegisterAllTools(ctx, registry)
 		// 工具都在位了才算得准 schema 总量跟上下文窗口的比例
-		mcp.DecideAndApply(registry, opts.BaseURL, opts.ContextWindow)
+		mcp.DecideAndApply(registry, opts.Protocol, opts.BaseURL, opts.ContextWindow)
 	}
 
 	return registry

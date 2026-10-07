@@ -26,11 +26,12 @@ func NewFactory(opts Options) *Factory { return &Factory{opts: opts} }
 
 // New 构造一个协议客户端。该过程只校验配置并装配 SDK，不执行网络访问。
 func (f *Factory) New(cfg config.ProviderConfig, systemPrompt string) (llm.Client, error) {
+	apiKey := cfg.ResolveAPIKey()
 	switch cfg.Protocol {
 	case config.ProtocolAnthropic:
 		httpClient := llmtransport.New(cfg.BaseURL, f.opts.BaseTransport)
 		client, err := llmanthropic.New(
-			cfg.Name, cfg.Model, cfg.APIKey, cfg.BaseURL, cfg.Thinking,
+			cfg.Name, cfg.Model, apiKey, cfg.BaseURL, cfg.Thinking,
 			systemPrompt, cfg.GetMaxOutputTokens(), httpClient,
 		)
 		if err != nil {
@@ -39,13 +40,23 @@ func (f *Factory) New(cfg config.ProviderConfig, systemPrompt string) (llm.Clien
 		return client, nil
 	case config.ProtocolOpenAI:
 		httpClient := &http.Client{Transport: f.opts.BaseTransport}
-		client, err := llmopenai.New(cfg.Name, cfg.Model, cfg.APIKey, cfg.BaseURL, cfg.Thinking, systemPrompt, httpClient)
+		client, err := llmopenai.NewResponses(
+			cfg.Name, cfg.Model, apiKey, cfg.BaseURL, cfg.Thinking,
+			systemPrompt, cfg.GetMaxOutputTokens(), httpClient,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("Provider %q（openai）装配失败: %w", safeName(cfg.Name), err)
 		}
 		return client, nil
+	case config.ProtocolOpenAICompat:
+		httpClient := &http.Client{Transport: f.opts.BaseTransport}
+		client, err := llmopenai.NewCompat(cfg.Name, cfg.Model, apiKey, cfg.BaseURL, systemPrompt, httpClient)
+		if err != nil {
+			return nil, fmt.Errorf("Provider %q（openai-compat）装配失败: %w", safeName(cfg.Name), err)
+		}
+		return client, nil
 	default:
-		return nil, fmt.Errorf("Provider %q 使用不支持的协议；仅支持 anthropic、openai: %w", safeName(cfg.Name), ErrUnknownProtocol)
+		return nil, fmt.Errorf("Provider %q 使用不支持的协议；仅支持 anthropic、openai、openai-compat: %w", safeName(cfg.Name), ErrUnknownProtocol)
 	}
 }
 
@@ -62,16 +73,35 @@ func (f *Factory) NewAll(providers []config.ProviderConfig) ([]llm.Client, error
 	return clients, nil
 }
 
-// NewModelResolver 返回沿用基准 Provider、仅允许覆盖模型 ID 的客户端构造函数。
+var anthropicModelAliases = map[string]string{
+	"haiku":  "claude-haiku-4-5-20251001",
+	"sonnet": "claude-sonnet-4-6-20250514",
+	"opus":   "claude-opus-4-6-20250514",
+}
+
+// NewModelResolver 返回沿用基准 Provider 的客户端构造函数。Anthropic 的内置
+// 模型别名解析为完整 ID；其他协议收到这些别名时继承当前模型，避免向兼容端点
+// 发送无效的 Claude 别名。明确给出的其它模型 ID 仍会覆盖当前模型。
 func (f *Factory) NewModelResolver(base config.ProviderConfig) func(string) (llm.Client, error) {
 	return func(model string) (llm.Client, error) {
 		cfg := base
-		model = strings.TrimSpace(model)
-		if model != "" && model != "inherit" {
-			cfg.Model = model
-		}
+		cfg.Model = resolveModel(base, model)
 		return f.New(cfg, "")
 	}
+}
+
+func resolveModel(base config.ProviderConfig, requested string) string {
+	requested = strings.TrimSpace(requested)
+	if requested == "" || strings.EqualFold(requested, "inherit") {
+		return base.Model
+	}
+	if alias, ok := anthropicModelAliases[strings.ToLower(requested)]; ok {
+		if base.Protocol == config.ProtocolAnthropic {
+			return alias
+		}
+		return base.Model
+	}
+	return requested
 }
 
 var ErrUnknownProtocol = errors.New("不支持的模型协议")

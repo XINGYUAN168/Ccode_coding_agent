@@ -145,7 +145,7 @@ func runPrint(userPrompt string, cfg *config.AppConfig, hookCfgs []hooks.Hook, o
 		for _, e := range mcpMgr.RegisterAllTools(context.Background(), registry) {
 			fmt.Fprintf(os.Stderr, "MCP warning: %s\n", e)
 		}
-		mcp.DecideAndApply(registry, p.BaseURL, p.GetContextWindow())
+		mcp.DecideAndApply(registry, p.Protocol, p.BaseURL, p.GetContextWindow())
 		defer mcpMgr.Shutdown()
 	}
 

@@ -43,7 +43,7 @@ func TestProviderConfigShape(t *testing.T) {
 			yamlFields = append(yamlFields, name)
 		}
 	}
-	want := []string{"name", "protocol", "base_url", "model", "api_key", "thinking"}
+	want := []string{"name", "protocol", "base_url", "model", "api_key", "thinking", "context_window", "max_output_tokens"}
 	if !reflect.DeepEqual(yamlFields, want) {
 		t.Fatalf("Provider YAML 字段 = %v，want %v", yamlFields, want)
 	}
@@ -54,11 +54,14 @@ func TestProviderConfigShape(t *testing.T) {
 	}
 }
 
-func TestThinkingRequired(t *testing.T) {
+func TestThinkingDefaultsToFalse(t *testing.T) {
 	body := strings.Replace(validConfig(""), "    thinking: false\n", "", 1)
-	_, err := LoadConfig(writeConfig(t, body))
-	if err == nil || !strings.Contains(err.Error(), "thinking") {
-		t.Fatalf("缺少 thinking 应失败，got %v", err)
+	cfg, err := LoadConfig(writeConfig(t, body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Providers[0].Thinking {
+		t.Fatal("缺少 thinking 时应默认为 false")
 	}
 }
 
@@ -111,13 +114,13 @@ func TestLoadConfigErrorsNeverLeakCanary(t *testing.T) {
 }
 
 func TestLoadConfigProtocolAndDuplicates(t *testing.T) {
-	for _, protocol := range []string{ProtocolAnthropic, ProtocolOpenAI} {
+	for _, protocol := range []string{ProtocolAnthropic, ProtocolOpenAI, ProtocolOpenAICompat} {
 		body := strings.Replace(validConfig(""), "protocol: openai", "protocol: "+protocol, 1)
 		if _, err := LoadConfig(writeConfig(t, body)); err != nil {
 			t.Fatalf("合法协议 %q 被拒绝: %v", protocol, err)
 		}
 	}
-	for _, protocol := range []string{"openai-compat", "OpenAI", "other"} {
+	for _, protocol := range []string{"OpenAI", "other"} {
 		body := strings.Replace(validConfig(""), "protocol: openai", "protocol: "+protocol, 1)
 		if _, err := LoadConfig(writeConfig(t, body)); err == nil {
 			t.Fatalf("非法协议 %q 未被拒绝", protocol)
@@ -141,14 +144,30 @@ func TestLoadConfigKeepsApplicationSettings(t *testing.T) {
 	}
 }
 
-func TestExplicitAPIKeyOnly(t *testing.T) {
-	t.Setenv("OPENAI_API_KEY", "environment-secret")
-	for _, value := range []string{`""`, `"   "`} {
-		body := strings.Replace(validConfig(""), "    api_key: "+configCanary+"\n", "    api_key: "+value+"\n", 1)
-		_, err := LoadConfig(writeConfig(t, body))
-		if err == nil || !strings.Contains(err.Error(), "api_key") {
-			t.Fatalf("环境变量不应补齐密钥 %s，got %v", value, err)
-		}
+func TestResolveAPIKey(t *testing.T) {
+	t.Setenv("OPENAI_API_KEY", "protocol-key")
+	t.Setenv("DEEPSEEK_API_KEY", "provider-key")
+
+	cases := []struct {
+		name string
+		cfg  ProviderConfig
+		want string
+	}{
+		{name: "显式配置优先", cfg: ProviderConfig{Name: "deepseek", Protocol: ProtocolOpenAICompat, APIKey: "direct-key"}, want: "direct-key"},
+		{name: "厂商环境变量优先", cfg: ProviderConfig{Name: "deepseek", Protocol: ProtocolOpenAICompat}, want: "provider-key"},
+		{name: "协议环境变量回退", cfg: ProviderConfig{Name: "custom", Protocol: ProtocolOpenAICompat}, want: "protocol-key"},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.cfg.ResolveAPIKey(); got != tt.want {
+				t.Fatalf("ResolveAPIKey() = %q，want %q", got, tt.want)
+			}
+		})
+	}
+
+	body := strings.Replace(validConfig(""), "    api_key: "+configCanary+"\n", "", 1)
+	if _, err := LoadConfig(writeConfig(t, body)); err != nil {
+		t.Fatalf("api_key 省略时配置仍应可加载: %v", err)
 	}
 }
 
@@ -156,10 +175,10 @@ func TestExampleConfig(t *testing.T) {
 	want := []ProviderConfig{
 		{Name: "anthropic", Protocol: ProtocolAnthropic, BaseURL: "", APIKey: "anthropic-example-invalid", Model: "claude-sonnet-4-6", Thinking: true},
 		{Name: "openai", Protocol: ProtocolOpenAI, BaseURL: "", APIKey: "openai-example-invalid", Model: "gpt-4.1", Thinking: false},
-		{Name: "gemini", Protocol: ProtocolOpenAI, BaseURL: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", APIKey: "gemini-example-invalid", Model: "gemini-2.5-pro", Thinking: true},
-		{Name: "kimi", Protocol: ProtocolOpenAI, BaseURL: "https://api.moonshot.cn/v1/chat/completions", APIKey: "kimi-example-invalid", Model: "kimi-k2.5", Thinking: true},
-		{Name: "glm", Protocol: ProtocolOpenAI, BaseURL: "https://open.bigmodel.cn/api/paas/v4/chat/completions", APIKey: "glm-example-invalid", Model: "glm-4.5", Thinking: true},
-		{Name: "deepseek", Protocol: ProtocolOpenAI, BaseURL: "https://api.deepseek.com/v1/chat/completions", APIKey: "deepseek-example-invalid", Model: "deepseek-chat", Thinking: false},
+		{Name: "gemini", Protocol: ProtocolOpenAICompat, BaseURL: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", APIKey: "gemini-example-invalid", Model: "gemini-2.5-pro", Thinking: true},
+		{Name: "kimi", Protocol: ProtocolOpenAICompat, BaseURL: "https://api.moonshot.cn/v1/chat/completions", APIKey: "kimi-example-invalid", Model: "kimi-k2.5", Thinking: true},
+		{Name: "glm", Protocol: ProtocolOpenAICompat, BaseURL: "https://open.bigmodel.cn/api/paas/v4/chat/completions", APIKey: "glm-example-invalid", Model: "glm-4.5", Thinking: true},
+		{Name: "deepseek", Protocol: ProtocolOpenAICompat, BaseURL: "https://api.deepseek.com/v1/chat/completions", APIKey: "deepseek-example-invalid", Model: "deepseek-chat", Thinking: false},
 	}
 
 	paths := []string{

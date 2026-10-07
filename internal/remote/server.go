@@ -395,7 +395,7 @@ func (s *Server) initMCPServers() {
 	// 工具都在位了才算得准 schema 总量跟上下文窗口的比例
 	if len(s.providers) > 0 {
 		p := &s.providers[0]
-		mcp.DecideAndApply(s.registry, p.BaseURL, p.GetContextWindow())
+		mcp.DecideAndApply(s.registry, p.Protocol, p.BaseURL, p.GetContextWindow())
 	}
 	if len(result.Servers) > 0 {
 		toolsByServer := make(map[string][]string)

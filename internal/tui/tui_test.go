@@ -36,8 +36,9 @@ func TestBannerUsesFiveLineHollowASCIICcodeLogo(t *testing.T) {
 		t.Fatalf("Logo 仍包含小猫图案：%q", banner)
 	}
 	for _, metadata := range []string{"Ccode v0.1.0", "test-model", model.getWorkDir()} {
-		if !strings.Contains(banner, metadata) {
-			t.Errorf("Logo 缺少元数据 %q", metadata)
+		visible := stripANSI(bannerDimStyle.Copy().MaxWidth(80 - 39 - 2).Render(metadata))
+		if !strings.Contains(banner, visible) {
+			t.Errorf("Logo 缺少可见元数据 %q", visible)
 		}
 	}
 }

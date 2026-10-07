@@ -38,12 +38,12 @@ mkdir -p .ccode
 cp .ccode/config.yaml.example .ccode/config.yaml
 ```
 
-请把示例密钥替换为自己的密钥，并避免提交包含真实密钥的配置文件。每个 Provider 必须且只能包含以下六个字段：
+请把示例密钥替换为自己的密钥，并避免提交包含真实密钥的配置文件。`api_key` 可省略，此时 Ccode 会读取对应厂商的环境变量；`context_window` 和 `max_output_tokens` 可用于覆盖自动值：
 
 ```yaml
 providers:
   - name: deepseek
-    protocol: openai
+    protocol: openai-compat
     base_url: https://api.deepseek.com/v1/chat/completions
     api_key: your-api-key
     model: deepseek-chat
@@ -55,13 +55,13 @@ providers:
 | 服务 | `protocol` | `base_url` |
 |---|---|---|
 | Anthropic | `anthropic` | 留空时使用官方端点 |
-| OpenAI | `openai` | 留空时使用官方端点 |
-| Google Gemini | `openai` | 使用兼容 OpenAI Chat Completions 的完整地址 |
-| Kimi | `openai` | 使用兼容 OpenAI Chat Completions 的完整地址 |
-| 智谱 GLM | `openai` | 使用兼容 OpenAI Chat Completions 的完整地址 |
-| DeepSeek | `openai` | 使用兼容 OpenAI Chat Completions 的完整地址 |
+| OpenAI | `openai` | 留空时使用官方 Responses API |
+| Google Gemini | `openai-compat` | 使用兼容 OpenAI Chat Completions 的完整地址 |
+| Kimi | `openai-compat` | 使用兼容 OpenAI Chat Completions 的完整地址 |
+| 智谱 GLM | `openai-compat` | 使用兼容 OpenAI Chat Completions 的完整地址 |
+| DeepSeek | `openai-compat` | 使用兼容 OpenAI Chat Completions 的完整地址 |
 
-`thinking` 控制该模型是否启用思考能力。配置中的第一个 Provider 是默认选择，交互界面中可以切换到其它已配置 Provider。
+`thinking` 控制该模型是否启用思考能力。`anthropic` 和 `openai` 使用各自官方协议，`openai-compat` 用于兼容 Chat Completions 的厂商。密钥环境变量依次支持 `ANTHROPIC_API_KEY`、`OPENAI_API_KEY`、`GEMINI_API_KEY`、`MOONSHOT_API_KEY`、`ZHIPUAI_API_KEY` 和 `DEEPSEEK_API_KEY`。配置中的第一个 Provider 是默认选择，交互界面中可以切换到其它已配置 Provider。
 
 常用顶层配置包括：
 

@@ -1,4 +1,5 @@
-# 每个模型服务严格使用以下六个字段。官方服务的 base_url 为空时使用默认聊天端点。
+# Provider 支持 name、protocol、base_url、api_key、model、thinking，另可用
+# context_window 和 max_output_tokens 覆盖自动推断值。官方服务的 base_url 可留空。
 providers:
   - name: anthropic
     protocol: anthropic
@@ -14,30 +15,30 @@ providers:
     model: gpt-4.1
     thinking: false
 
-  # 下列服务公开兼容 OpenAI Chat Completions，因此统一使用 openai 协议和完整请求地址。
+  # 下列服务兼容 OpenAI Chat Completions，因此使用 openai-compat 和完整请求地址。
   - name: gemini
-    protocol: openai
+    protocol: openai-compat
     base_url: https://generativelanguage.googleapis.com/v1beta/openai/chat/completions
     api_key: gemini-example-invalid
     model: gemini-2.5-pro
     thinking: true
 
   - name: kimi
-    protocol: openai
+    protocol: openai-compat
     base_url: https://api.moonshot.cn/v1/chat/completions
     api_key: kimi-example-invalid
     model: kimi-k2.5
     thinking: true
 
   - name: glm
-    protocol: openai
+    protocol: openai-compat
     base_url: https://open.bigmodel.cn/api/paas/v4/chat/completions
     api_key: glm-example-invalid
     model: glm-4.5
     thinking: true
 
   - name: deepseek
-    protocol: openai
+    protocol: openai-compat
     base_url: https://api.deepseek.com/v1/chat/completions
     api_key: deepseek-example-invalid
     model: deepseek-chat

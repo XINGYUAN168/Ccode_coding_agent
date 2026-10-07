@@ -19,8 +19,9 @@ const modelInfoTimeout = 2 * time.Second
 const maxModelsBodyBytes = 1 << 20
 
 var defaultChatEndpoints = map[string]string{
-	config.ProtocolAnthropic: "https://api.anthropic.com/v1/messages",
-	config.ProtocolOpenAI:    "https://api.openai.com/v1/chat/completions",
+	config.ProtocolAnthropic:    "https://api.anthropic.com/v1/messages",
+	config.ProtocolOpenAI:       "https://api.openai.com/v1/responses",
+	config.ProtocolOpenAICompat: "https://api.openai.com/v1/chat/completions",
 }
 
 var ErrModelInfoUnavailable = errors.New("模型信息不可用，将使用配置值")
@@ -55,10 +56,10 @@ func (f *Factory) ResolveModelInfo(ctx context.Context, cfg config.ProviderConfi
 	}
 	switch cfg.Protocol {
 	case config.ProtocolAnthropic:
-		req.Header.Set("x-api-key", cfg.APIKey)
+		req.Header.Set("x-api-key", cfg.ResolveAPIKey())
 		req.Header.Set("anthropic-version", "2023-06-01")
-	case config.ProtocolOpenAI:
-		req.Header.Set("Authorization", "Bearer "+cfg.APIKey)
+	case config.ProtocolOpenAI, config.ProtocolOpenAICompat:
+		req.Header.Set("Authorization", "Bearer "+cfg.ResolveAPIKey())
 	default:
 		return llm.ModelInfo{}, ErrModelInfoUnavailable
 	}
@@ -101,6 +102,11 @@ func deriveModelsURL(protocol, chatEndpoint string) (string, bool) {
 		}
 		u.Path = strings.TrimSuffix(u.Path, "/messages") + "/models"
 	case config.ProtocolOpenAI:
+		if !strings.HasSuffix(u.Path, "/responses") {
+			return "", false
+		}
+		u.Path = strings.TrimSuffix(u.Path, "/responses") + "/models"
+	case config.ProtocolOpenAICompat:
 		if !strings.HasSuffix(u.Path, "/chat/completions") {
 			return "", false
 		}

@@ -71,10 +71,11 @@ func TestBrandIsYellowAndCompactFallback(t *testing.T) {
 	}
 	metadata := []string{"Ccode v0.1.0", "deepseek-chat", m.getWorkDir()}
 	for i, want := range metadata {
-		if !strings.Contains(lines[i], want) {
-			t.Errorf("Logo 第 %d 行缺少元数据 %q：%q", i+1, want, lines[i])
+		visible := stripANSI(bannerDimStyle.Copy().MaxWidth(80 - 39 - 2).Render(want))
+		if !strings.Contains(lines[i], visible) {
+			t.Errorf("Logo 第 %d 行缺少可见元数据 %q：%q", i+1, visible, lines[i])
 		}
-		if got, wantColumn := strings.Index(lines[i], want), 41; got != wantColumn {
+		if got, wantColumn := strings.Index(lines[i], visible), 41; got != wantColumn {
 			t.Errorf("Logo 第 %d 行元数据起始列 = %d，want %d：%q", i+1, got, wantColumn, lines[i])
 		}
 	}
