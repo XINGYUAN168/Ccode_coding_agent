@@ -1,0 +1,63 @@
+# Ccode — 敏感文件与本地构建产物忽略规则
+# 原则：只忽略确定不应入库的内容；config.example.yaml 保持可跟踪。
+
+# --- 真实配置与密钥（仓库根目录） ---
+# 仅忽略根目录的真实配置；config.example.yaml 不在此列，必须可跟踪。
+/config.yaml
+/config.yaml.local
+/config.yaml.bak
+
+# --- 常见本地密钥 / 凭证备份 ---
+*.key
+*.pem
+*.p12
+*.pfx
+*.secret
+.env
+.env.*
+!.env.example
+/ccode-e2e.env
+
+# --- 构建产物 ---
+# 仓库根目录的本地 ccode 二进制（三平台交叉构建产物写入 /tmp，不入库）。
+/ccode
+/ccode-*
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# --- 测试 / 覆盖率 / 临时文件 ---
+*.out
+*.test
+*.tmp
+*.swp
+*.swo
+*~
+.DS_Store
+
+# --- 编辑器与本地运行状态 ---
+.idea/
+.vscode/
+.ccode/*
+!.ccode/config.yaml.example
+!.ccode/skills/
+.ccode/skills/*
+!.ccode/skills/frontend-design/
+!.ccode/skills/frontend-design/**
+!.ccode/skills/skill-creator/
+!.ccode/skills/skill-creator/**
+
+# --- 本地审批、迁移与旧参考材料（不进入产品仓库） ---
+/02 LLM API 与文件管理器/
+/03 工具系统/
+/04 React与Agent Loop/
+/05 System Prompt/
+/06 权限系统/
+/07 MCP协议/
+/Ccode迁移规划/
+/注释中文化与02-05任务补全/
+/LONG_TERM_PLAN.md
+/assets/
+/test/

@@ -1,0 +1,53 @@
+# 每个模型服务严格使用以下六个字段。官方服务的 base_url 为空时使用默认聊天端点。
+providers:
+  - name: anthropic
+    protocol: anthropic
+    base_url: ""
+    api_key: anthropic-example-invalid
+    model: claude-sonnet-4-6
+    thinking: true
+
+  - name: openai
+    protocol: openai
+    base_url: ""
+    api_key: openai-example-invalid
+    model: gpt-4.1
+    thinking: false
+
+  # 下列服务公开兼容 OpenAI Chat Completions，因此统一使用 openai 协议和完整请求地址。
+  - name: gemini
+    protocol: openai
+    base_url: https://generativelanguage.googleapis.com/v1beta/openai/chat/completions
+    api_key: gemini-example-invalid
+    model: gemini-2.5-pro
+    thinking: true
+
+  - name: kimi
+    protocol: openai
+    base_url: https://api.moonshot.cn/v1/chat/completions
+    api_key: kimi-example-invalid
+    model: kimi-k2.5
+    thinking: true
+
+  - name: glm
+    protocol: openai
+    base_url: https://open.bigmodel.cn/api/paas/v4/chat/completions
+    api_key: glm-example-invalid
+    model: glm-4.5
+    thinking: true
+
+  - name: deepseek
+    protocol: openai
+    base_url: https://api.deepseek.com/v1/chat/completions
+    api_key: deepseek-example-invalid
+    model: deepseek-chat
+    thinking: false
+
+permission_mode: default
+
+mcp_servers:
+  - name: context7
+    command: npx
+    args: ["-y", "@upstash/context7-mcp"]
+
+enable_coordinator_mode: false
