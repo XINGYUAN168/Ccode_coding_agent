@@ -71,17 +71,18 @@ func TestBrandIsYellowAndCompactFallback(t *testing.T) {
 	}
 	metadata := []string{"Ccode v0.1.0", "deepseek-chat", m.getWorkDir()}
 	for i, want := range metadata {
+		lineIndex := i + len(lines) - len(metadata)
 		visible := stripANSI(bannerDimStyle.Copy().MaxWidth(80 - 39 - 2).Render(want))
-		if !strings.Contains(lines[i], visible) {
-			t.Errorf("Logo 第 %d 行缺少可见元数据 %q：%q", i+1, visible, lines[i])
+		if !strings.Contains(lines[lineIndex], visible) {
+			t.Errorf("Logo 第 %d 行缺少可见元数据 %q：%q", lineIndex+1, visible, lines[lineIndex])
 		}
-		if got, wantColumn := strings.Index(lines[i], visible), 41; got != wantColumn {
-			t.Errorf("Logo 第 %d 行元数据起始列 = %d，want %d：%q", i+1, got, wantColumn, lines[i])
+		if got, wantColumn := strings.Index(lines[lineIndex], visible), 41; got != wantColumn {
+			t.Errorf("Logo 第 %d 行元数据起始列 = %d，want %d：%q", lineIndex+1, got, wantColumn, lines[lineIndex])
 		}
 	}
-	if strings.Contains(lines[3], "Ccode v0.1.0") || strings.Contains(lines[3], "deepseek-chat") ||
-		strings.Contains(lines[4], "Ccode v0.1.0") || strings.Contains(lines[4], "deepseek-chat") {
-		t.Fatalf("Logo 后两行不应包含元数据：\n%s", brand)
+	if strings.Contains(lines[0], "Ccode v0.1.0") || strings.Contains(lines[0], "deepseek-chat") ||
+		strings.Contains(lines[1], "Ccode v0.1.0") || strings.Contains(lines[1], "deepseek-chat") {
+		t.Fatalf("Logo 前两行不应包含底端对齐的元数据：\n%s", brand)
 	}
 	if got := strings.TrimSpace(stripANSI(m.renderBrand(true))); got != "CCODE" {
 		t.Fatalf("紧凑 Logo = %q，want CCODE", got)

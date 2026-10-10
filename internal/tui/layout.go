@@ -68,12 +68,14 @@ func (m Model) renderBrand(compact bool) string {
 	}
 	logoWidth := lipgloss.Width(compactLogoRows[len(compactLogoRows)-1])
 	metadataWidth := max(1, width-logoWidth-2)
+	metadataStartRow := max(0, len(compactLogoRows)-len(metadata))
 	lines := make([]string, 0, len(compactLogoRows))
 	for i, row := range compactLogoRows {
 		line := bannerStyle.Render(row)
-		if i < len(metadata) {
+		metadataIndex := i - metadataStartRow
+		if metadataIndex >= 0 && metadataIndex < len(metadata) {
 			paddedRow := row + strings.Repeat(" ", max(0, logoWidth-lipgloss.Width(row)))
-			meta := bannerDimStyle.Copy().MaxWidth(metadataWidth).Render(metadata[i])
+			meta := bannerDimStyle.Copy().MaxWidth(metadataWidth).Render(metadata[metadataIndex])
 			line = bannerStyle.Render(paddedRow) + "  " + meta
 		}
 		lines = append(lines, line)
