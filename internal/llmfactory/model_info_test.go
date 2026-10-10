@@ -20,11 +20,11 @@ func TestDeriveModelsURL(t *testing.T) {
 		ok       bool
 	}{
 		{config.ProtocolAnthropic, "https://api.anthropic.com/v1/messages?q=1", "https://api.anthropic.com/v1/models", true},
-		{config.ProtocolOpenAI, "https://api.openai.com/v1/chat/completions", "https://api.openai.com/v1/models", true},
-		{config.ProtocolOpenAI, "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", "https://generativelanguage.googleapis.com/v1beta/openai/models", true},
-		{config.ProtocolOpenAI, "https://api.moonshot.cn/v1/chat/completions", "https://api.moonshot.cn/v1/models", true},
-		{config.ProtocolOpenAI, "https://open.bigmodel.cn/api/paas/v4/chat/completions", "https://open.bigmodel.cn/api/paas/v4/models", true},
-		{config.ProtocolOpenAI, "https://api.deepseek.com/v1/chat/completions", "https://api.deepseek.com/v1/models", true},
+		{config.ProtocolOpenAI, "https://api.openai.com/v1/responses", "https://api.openai.com/v1/models", true},
+		{config.ProtocolOpenAICompat, "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", "https://generativelanguage.googleapis.com/v1beta/openai/models", true},
+		{config.ProtocolOpenAICompat, "https://api.moonshot.cn/v1/chat/completions", "https://api.moonshot.cn/v1/models", true},
+		{config.ProtocolOpenAICompat, "https://open.bigmodel.cn/api/paas/v4/chat/completions", "https://open.bigmodel.cn/api/paas/v4/models", true},
+		{config.ProtocolOpenAICompat, "https://api.deepseek.com/v1/chat/completions", "https://api.deepseek.com/v1/models", true},
 		{config.ProtocolOpenAI, "https://example.test/custom", "", false},
 	}
 	for _, tt := range tests {
@@ -45,11 +45,11 @@ func TestResolveModelInfoProviderMatrix(t *testing.T) {
 		headerWant string
 	}{
 		{name: "anthropic", protocol: config.ProtocolAnthropic, chatURL: "https://api.anthropic.com/v1/messages", modelsURL: "https://api.anthropic.com/v1/models", headerName: "x-api-key", headerWant: "explicit-key"},
-		{name: "openai", protocol: config.ProtocolOpenAI, chatURL: "https://api.openai.com/v1/chat/completions", modelsURL: "https://api.openai.com/v1/models", headerName: "Authorization", headerWant: "Bearer explicit-key"},
-		{name: "gemini", protocol: config.ProtocolOpenAI, chatURL: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", modelsURL: "https://generativelanguage.googleapis.com/v1beta/openai/models", headerName: "Authorization", headerWant: "Bearer explicit-key"},
-		{name: "kimi", protocol: config.ProtocolOpenAI, chatURL: "https://api.moonshot.cn/v1/chat/completions", modelsURL: "https://api.moonshot.cn/v1/models", headerName: "Authorization", headerWant: "Bearer explicit-key"},
-		{name: "glm", protocol: config.ProtocolOpenAI, chatURL: "https://open.bigmodel.cn/api/paas/v4/chat/completions", modelsURL: "https://open.bigmodel.cn/api/paas/v4/models", headerName: "Authorization", headerWant: "Bearer explicit-key"},
-		{name: "deepseek", protocol: config.ProtocolOpenAI, chatURL: "https://api.deepseek.com/v1/chat/completions", modelsURL: "https://api.deepseek.com/v1/models", headerName: "Authorization", headerWant: "Bearer explicit-key"},
+		{name: "openai", protocol: config.ProtocolOpenAI, chatURL: "https://api.openai.com/v1/responses", modelsURL: "https://api.openai.com/v1/models", headerName: "Authorization", headerWant: "Bearer explicit-key"},
+		{name: "gemini", protocol: config.ProtocolOpenAICompat, chatURL: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", modelsURL: "https://generativelanguage.googleapis.com/v1beta/openai/models", headerName: "Authorization", headerWant: "Bearer explicit-key"},
+		{name: "kimi", protocol: config.ProtocolOpenAICompat, chatURL: "https://api.moonshot.cn/v1/chat/completions", modelsURL: "https://api.moonshot.cn/v1/models", headerName: "Authorization", headerWant: "Bearer explicit-key"},
+		{name: "glm", protocol: config.ProtocolOpenAICompat, chatURL: "https://open.bigmodel.cn/api/paas/v4/chat/completions", modelsURL: "https://open.bigmodel.cn/api/paas/v4/models", headerName: "Authorization", headerWant: "Bearer explicit-key"},
+		{name: "deepseek", protocol: config.ProtocolOpenAICompat, chatURL: "https://api.deepseek.com/v1/chat/completions", modelsURL: "https://api.deepseek.com/v1/models", headerName: "Authorization", headerWant: "Bearer explicit-key"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -117,7 +117,7 @@ func TestResolveModelInfoFallbacks(t *testing.T) {
 			}
 			factory := NewFactory(Options{BaseTransport: tt.transport})
 			_, err := factory.ResolveModelInfo(ctx, config.ProviderConfig{
-				Name: "provider", Protocol: config.ProtocolOpenAI,
+				Name: "provider", Protocol: config.ProtocolOpenAICompat,
 				BaseURL: "https://example.test/v1/chat/completions", APIKey: "explicit-key", Model: "target-model",
 			})
 			if !errors.Is(err, ErrModelInfoUnavailable) {
@@ -146,7 +146,7 @@ func TestResolveModelInfo(t *testing.T) {
 	})
 	factory := NewFactory(Options{BaseTransport: transport})
 	info, err := factory.ResolveModelInfo(context.Background(), config.ProviderConfig{
-		Name: "provider", Protocol: config.ProtocolOpenAI,
+		Name: "provider", Protocol: config.ProtocolOpenAICompat,
 		BaseURL: "https://example.test/v1/chat/completions?q=chat", APIKey: "explicit-key", Model: "model-a",
 	})
 	if err != nil {
@@ -183,7 +183,7 @@ func TestResolveModelInfoFailureIsSafe(t *testing.T) {
 		}, nil
 	})})
 	_, err := factory.ResolveModelInfo(context.Background(), config.ProviderConfig{
-		Name: "p", Protocol: config.ProtocolOpenAI,
+		Name: "p", Protocol: config.ProtocolOpenAICompat,
 		BaseURL: "https://example.test/v1/chat/completions", APIKey: canary, Model: "m",
 	})
 	if err == nil || strings.Contains(err.Error(), canary) || strings.Contains(err.Error(), "example.test") {

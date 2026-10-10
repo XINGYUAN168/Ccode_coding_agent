@@ -15,13 +15,33 @@ import (
 )
 
 const (
-	ProtocolAnthropic = "anthropic"
-	ProtocolOpenAI    = "openai"
+	ProtocolAnthropic    = "anthropic"
+	ProtocolOpenAI       = "openai"
+	ProtocolOpenAICompat = "openai-compat"
 )
 
 var validProtocols = map[string]bool{
-	ProtocolAnthropic: true,
-	ProtocolOpenAI:    true,
+	ProtocolAnthropic:    true,
+	ProtocolOpenAI:       true,
+	ProtocolOpenAICompat: true,
+}
+
+var protocolAPIKeyEnvs = map[string]string{
+	ProtocolAnthropic:    "ANTHROPIC_API_KEY",
+	ProtocolOpenAI:       "OPENAI_API_KEY",
+	ProtocolOpenAICompat: "OPENAI_API_KEY",
+}
+
+var providerAPIKeyEnvs = map[string]string{
+	"anthropic": "ANTHROPIC_API_KEY",
+	"openai":    "OPENAI_API_KEY",
+	"gemini":    "GEMINI_API_KEY",
+	"google":    "GEMINI_API_KEY",
+	"kimi":      "MOONSHOT_API_KEY",
+	"moonshot":  "MOONSHOT_API_KEY",
+	"glm":       "ZHIPUAI_API_KEY",
+	"zhipu":     "ZHIPUAI_API_KEY",
+	"deepseek":  "DEEPSEEK_API_KEY",
 }
 
 type ConfigError struct {
@@ -31,20 +51,22 @@ type ConfigError struct {
 func (e *ConfigError) Error() string { return e.Message }
 
 type ProviderConfig struct {
-	Name     string `yaml:"name"`
-	Protocol string `yaml:"protocol"`
-	BaseURL  string `yaml:"base_url"`
-	Model    string `yaml:"model"`
-	APIKey   string `yaml:"api_key"`
-	Thinking bool   `yaml:"thinking"`
+	Name            string `yaml:"name"`
+	Protocol        string `yaml:"protocol"`
+	BaseURL         string `yaml:"base_url"`
+	Model           string `yaml:"model"`
+	APIKey          string `yaml:"api_key"`
+	Thinking        bool   `yaml:"thinking"`
+	ContextWindow   int    `yaml:"context_window"`
+	MaxOutputTokens int    `yaml:"max_output_tokens"`
 
 	// fetchedContextWindow 缓存模型信息查询返回的上下文容量。零值表示尚未取得
 	// 有效容量；该字段只在运行期使用，不参与 YAML 编解码。
 	fetchedContextWindow int
 }
 
-// UnmarshalYAML 对 Provider 节点执行独立的六字段白名单校验，并用指针区分
-// thinking 缺失与显式 false。错误只包含安全字段名，不回显原始 YAML 或密钥值。
+// UnmarshalYAML 对 Provider 节点执行字段白名单校验。错误只包含安全字段名，
+// 不回显原始 YAML 或密钥值。
 func (p *ProviderConfig) UnmarshalYAML(node *yaml.Node) error {
 	if node.Kind != yaml.MappingNode {
 		return &ConfigError{Message: "provider 必须是映射"}
@@ -52,6 +74,7 @@ func (p *ProviderConfig) UnmarshalYAML(node *yaml.Node) error {
 	allowed := map[string]bool{
 		"name": true, "protocol": true, "base_url": true,
 		"api_key": true, "model": true, "thinking": true,
+		"context_window": true, "max_output_tokens": true,
 	}
 	seen := make(map[string]bool, len(allowed))
 	for i := 0; i+1 < len(node.Content); i += 2 {
@@ -65,27 +88,28 @@ func (p *ProviderConfig) UnmarshalYAML(node *yaml.Node) error {
 		seen[key] = true
 	}
 	type rawProvider struct {
-		Name     string `yaml:"name"`
-		Protocol string `yaml:"protocol"`
-		BaseURL  string `yaml:"base_url"`
-		APIKey   string `yaml:"api_key"`
-		Model    string `yaml:"model"`
-		Thinking *bool  `yaml:"thinking"`
+		Name            string `yaml:"name"`
+		Protocol        string `yaml:"protocol"`
+		BaseURL         string `yaml:"base_url"`
+		APIKey          string `yaml:"api_key"`
+		Model           string `yaml:"model"`
+		Thinking        bool   `yaml:"thinking"`
+		ContextWindow   int    `yaml:"context_window"`
+		MaxOutputTokens int    `yaml:"max_output_tokens"`
 	}
 	var raw rawProvider
 	if err := node.Decode(&raw); err != nil {
 		return &ConfigError{Message: "provider 字段类型无效"}
 	}
-	if raw.Thinking == nil {
-		return &ConfigError{Message: "provider 缺少必填字段 thinking"}
-	}
 	*p = ProviderConfig{
-		Name:     strings.TrimSpace(raw.Name),
-		Protocol: strings.TrimSpace(raw.Protocol),
-		BaseURL:  strings.TrimSpace(raw.BaseURL),
-		APIKey:   raw.APIKey,
-		Model:    strings.TrimSpace(raw.Model),
-		Thinking: *raw.Thinking,
+		Name:            strings.TrimSpace(raw.Name),
+		Protocol:        strings.TrimSpace(raw.Protocol),
+		BaseURL:         strings.TrimSpace(raw.BaseURL),
+		APIKey:          raw.APIKey,
+		Model:           strings.TrimSpace(raw.Model),
+		Thinking:        raw.Thinking,
+		ContextWindow:   raw.ContextWindow,
+		MaxOutputTokens: raw.MaxOutputTokens,
 	}
 	return nil
 }
@@ -126,8 +150,11 @@ func lookupModelContextWindow(model string) int {
 	return 0
 }
 
-// GetContextWindow 按“服务端正值、模型名称映射、保守默认”的顺序解析容量。
+// GetContextWindow 按“显式配置、服务端正值、模型名称映射、保守默认”的顺序解析容量。
 func (p *ProviderConfig) GetContextWindow() int {
+	if p.ContextWindow > 0 {
+		return p.ContextWindow
+	}
 	if p.fetchedContextWindow > 0 {
 		return p.fetchedContextWindow
 	}
@@ -141,10 +168,27 @@ func (p *ProviderConfig) GetContextWindow() int {
 }
 
 func (p *ProviderConfig) GetMaxOutputTokens() int {
+	if p.MaxOutputTokens > 0 {
+		return p.MaxOutputTokens
+	}
 	if p.Thinking {
 		return 64000
 	}
 	return 8192
+}
+
+// ResolveAPIKey 优先使用配置中的密钥；未配置时先按 Provider 名查找厂商环境变量，
+// 再回退到协议的通用环境变量。这样兼容上游配置习惯，也允许六类服务分别设密钥。
+func (p *ProviderConfig) ResolveAPIKey() string {
+	if key := strings.TrimSpace(p.APIKey); key != "" {
+		return key
+	}
+	if envName := providerAPIKeyEnvs[strings.ToLower(strings.TrimSpace(p.Name))]; envName != "" {
+		if key := strings.TrimSpace(os.Getenv(envName)); key != "" {
+			return key
+		}
+	}
+	return strings.TrimSpace(os.Getenv(protocolAPIKeyEnvs[p.Protocol]))
 }
 
 type MCPServerConfig struct {
@@ -247,14 +291,13 @@ func validateProviders(cfg *AppConfig) error {
 	if len(cfg.Providers) == 0 {
 		return &ConfigError{Message: "At least one provider must be configured"}
 	}
-	requiredFields := []string{"name", "protocol", "api_key", "model"}
+	requiredFields := []string{"name", "protocol", "model"}
 	seen := make(map[string]int, len(cfg.Providers))
 	for i, p := range cfg.Providers {
 		var missing []string
 		values := map[string]string{
 			"name":     p.Name,
 			"protocol": p.Protocol,
-			"api_key":  p.APIKey,
 			"model":    p.Model,
 		}
 		for _, f := range requiredFields {
@@ -269,8 +312,14 @@ func validateProviders(cfg *AppConfig) error {
 		}
 		if !validProtocols[p.Protocol] {
 			return &ConfigError{
-				Message: fmt.Sprintf("Provider #%d: invalid protocol %q, must be one of: anthropic, openai", i+1, p.Protocol),
+				Message: fmt.Sprintf("Provider #%d: invalid protocol %q, must be one of: anthropic, openai, openai-compat", i+1, p.Protocol),
 			}
+		}
+		if p.ContextWindow < 0 {
+			return &ConfigError{Message: fmt.Sprintf("Provider #%d: context_window 不能为负数", i+1)}
+		}
+		if p.MaxOutputTokens < 0 {
+			return &ConfigError{Message: fmt.Sprintf("Provider #%d: max_output_tokens 不能为负数", i+1)}
 		}
 		if first, ok := seen[p.Name]; ok {
 			return &ConfigError{Message: fmt.Sprintf("Provider #%d: duplicate name %q (first declared at #%d)", i+1, p.Name, first+1)}

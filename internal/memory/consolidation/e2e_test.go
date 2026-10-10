@@ -79,7 +79,7 @@ func TestE2E_ConsolidationMergesDuplicates(t *testing.T) {
 	// 构建 LLM 客户端
 	cfg := config.ProviderConfig{}
 	cfg.Name = "e2e"
-	cfg.Protocol = config.ProtocolOpenAI
+	cfg.Protocol = config.ProtocolOpenAICompat
 	cfg.BaseURL = baseURL
 	cfg.APIKey = apiKey
 	cfg.Model = model
@@ -113,7 +113,7 @@ func TestE2E_ConsolidationMergesDuplicates(t *testing.T) {
 	conv := conversation.NewManager()
 	conv.AddUserMessage(prompt)
 
-	subAgent := agent.New(client, subRegistry, "openai")
+	subAgent := agent.New(client, subRegistry, config.ProtocolOpenAICompat)
 	subAgent.MaxIterations = 15
 	subAgent.Checker = checker
 	subAgent.WorkDir = dir

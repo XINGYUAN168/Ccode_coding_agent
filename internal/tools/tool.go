@@ -154,7 +154,7 @@ func isDeferred(t Tool) bool {
 }
 
 func isOpenAIProtocol(protocol string) bool {
-	return protocol == "openai"
+	return protocol == "openai" || protocol == "openai-compat"
 }
 
 // GetAllSchemas 构建这一轮要发给模型的工具列表。

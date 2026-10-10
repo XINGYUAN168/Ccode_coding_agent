@@ -38,9 +38,12 @@ const (
 
 var officialHosts = map[string]bool{"api.anthropic.com": true}
 
-// IsOfficialAnthropicEndpoint 判断是不是官方端点。baseURL 为空表示走 SDK 默认
-// 地址，也就是官方。
-func IsOfficialAnthropicEndpoint(baseURL string) bool {
+// IsOfficialAnthropicEndpoint 判断配置是否同时使用 Anthropic 协议和官方端点。
+// 只有该组合支持原生 defer_loading；其他协议即使 baseURL 为空也不能误判为原生模式。
+func IsOfficialAnthropicEndpoint(protocol, baseURL string) bool {
+	if strings.ToLower(strings.TrimSpace(protocol)) != "anthropic" {
+		return false
+	}
 	if baseURL == "" {
 		return true
 	}
@@ -57,12 +60,15 @@ func EstimateSchemaTokens(schemaChars int) int {
 }
 
 // DecideMode 定加载模式。
-func DecideMode(baseURL string, contextWindow, mcpSchemaChars, thresholdPercent int) tools.McpLoadingMode {
+func DecideMode(protocol, baseURL string, contextWindow, mcpSchemaChars, thresholdPercent int) tools.McpLoadingMode {
 	switch strings.ToLower(strings.TrimSpace(os.Getenv(envLoadingOverride))) {
 	case "eager":
 		return tools.McpLoadingEager
 	case "native":
-		return tools.McpLoadingNative
+		if IsOfficialAnthropicEndpoint(protocol, baseURL) {
+			return tools.McpLoadingNative
+		}
+		return tools.McpLoadingDispatch
 	case "dispatch":
 		return tools.McpLoadingDispatch
 	}
@@ -76,7 +82,7 @@ func DecideMode(baseURL string, contextWindow, mcpSchemaChars, thresholdPercent 
 	if float64(EstimateSchemaTokens(mcpSchemaChars)) < budget {
 		return tools.McpLoadingEager
 	}
-	if IsOfficialAnthropicEndpoint(baseURL) {
+	if IsOfficialAnthropicEndpoint(protocol, baseURL) {
 		return tools.McpLoadingNative
 	}
 	return tools.McpLoadingDispatch
@@ -120,8 +126,8 @@ func ApplyMode(registry *tools.Registry, mode tools.McpLoadingMode) {
 }
 
 // DecideAndApply 是连上 MCP 之后调一次的入口。
-func DecideAndApply(registry *tools.Registry, baseURL string, contextWindow int) tools.McpLoadingMode {
-	mode := DecideMode(baseURL, contextWindow, MeasureSchemaChars(registry), DefaultEagerThresholdPercent)
+func DecideAndApply(registry *tools.Registry, protocol, baseURL string, contextWindow int) tools.McpLoadingMode {
+	mode := DecideMode(protocol, baseURL, contextWindow, MeasureSchemaChars(registry), DefaultEagerThresholdPercent)
 	ApplyMode(registry, mode)
 	return mode
 }

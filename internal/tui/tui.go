@@ -562,7 +562,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		// 工具都在位了才算得准 schema 总量跟上下文窗口的比例
 		if p := m.selectedProvider; p != nil {
-			mcp.DecideAndApply(m.registry, p.BaseURL, p.GetContextWindow())
+			mcp.DecideAndApply(m.registry, p.Protocol, p.BaseURL, p.GetContextWindow())
 		}
 		registered := len(msg.result.Tools)
 		if registered > 0 {

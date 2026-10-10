@@ -1,4 +1,4 @@
-// Package openai 将 OpenAI Chat Completions SDK 适配为项目内部的协议无关客户端。
+// Package openai 提供 OpenAI Responses 与兼容 Chat Completions 两种客户端。
 package openai
 
 import (
@@ -20,16 +20,21 @@ import (
 	"ccode/internal/llmtransport"
 )
 
-// Client 同时服务 OpenAI 官方端点和所有兼容 Chat Completions 的完整请求地址。
+// Client 服务兼容 OpenAI Chat Completions 的第三方端点。
 type Client struct {
 	client       openaisdk.Client
 	model        string
 	systemPrompt string
 }
 
-// New 使用显式配置构造客户端。thinking 只保持配置对称性，不改变任何请求字段。
-// 构造过程不会发起网络请求。
+// New 保留原有构造入口，实际创建 Chat Completions 兼容客户端。
 func New(name, model, apiKey, baseURL string, thinking bool, systemPrompt string, hc *http.Client) (*Client, error) {
+	_ = thinking
+	return NewCompat(name, model, apiKey, baseURL, systemPrompt, hc)
+}
+
+// NewCompat 使用显式配置构造 Chat Completions 兼容客户端。构造过程不会发起网络请求。
+func NewCompat(name, model, apiKey, baseURL, systemPrompt string, hc *http.Client) (*Client, error) {
 	name = strings.TrimSpace(name)
 	model = strings.TrimSpace(model)
 	switch {
@@ -40,8 +45,6 @@ func New(name, model, apiKey, baseURL string, thinking bool, systemPrompt string
 	case strings.TrimSpace(apiKey) == "":
 		return nil, llm.NewError(llm.ErrorAuth, "OpenAI Provider 缺少 api_key", nil)
 	}
-	_ = thinking
-
 	var baseTransport http.RoundTripper
 	if hc != nil {
 		baseTransport = hc.Transport
